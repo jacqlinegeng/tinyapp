@@ -11,6 +11,9 @@
     </head>
 
     <body>
+
+      <%- include('partials/_header') %>
+      
       <div class="card text-center">
         <div class="card-header">
         <div class="card-body">
@@ -19,6 +22,21 @@
             Short URL ID: <a href="/u/<%= id %>"><%= id %></a>
           </p>
         </div>
+        </div class="card-footer text-muted"></div>
+      </div>
+
+      <div class="card text-center">
+        <div class="card-header">
+        <div class="card-body">
+          <h5 class="card-title">Edit</h5>
+          <form class="form-inline" action="/urls/<%= id %>/edit" method="POST">
+          <p class="card-text">
+            New URL: <input type="text" id="name" name="newURL" required
+            minlength="4" maxlength="20" size="20">
+            <input class="btn btn-primary" type="submit" value="Submit">
+          </p>
+          </form>
+          </div>
         </div class="card-footer text-muted"></div>
       </div>
 
