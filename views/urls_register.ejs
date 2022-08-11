@@ -14,11 +14,13 @@
 
     <%- include('partials/_header') %>
 
+    <main style="margin: 1em;">
 
     <h3>Register</h3>
+
     <form action="/register" method="POST">
-      <div class="form-group">
-        <label for="exampleInputEmail1">Email address</label>
+      <div class="form-group mb-2">
+        <label for="email">Email address</label>
         <input name="email" type="email" class="form-control" id="exampleInputEmail1" aria-describedby="emailHelp" placeholder="Enter email">
         <small id="emailHelp" class="form-text text-muted">We'll never share your email with anyone else.</small>
       </div>
@@ -28,7 +30,6 @@
       </div>
       <button type="submit" class="btn btn-primary">Register</button>
     </form>
-    
     </main> 
   </body>
   </html>
