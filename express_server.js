@@ -70,12 +70,13 @@ app.get("/urls", (req, res) => {
 });
 
 app.get("/urls/new", (req, res) => {
-  const templateVars = { urls: urlDatabase, user: req.cookies["user_id"] };
+  const email = req.body.email;
+  const templateVars = { urls: urlDatabase, email: req.cookies["user_id"] };
   res.render("urls_new", templateVars);
 });
 
 app.get("/urls/:id", (req, res) => {
-  const templateVars = { id: req.params.id, longURL:urlDatabase[req.params.id]};
+  const templateVars = { id: req.params.id, longURL: urlDatabase[req.params.id]};
   res.render("urls_show", templateVars);
 });
 
@@ -94,7 +95,7 @@ app.get("/register", (req, res) => {
 
 
 app.get('/login', (req, res) => {
-  const userId = req.cookies["userId"];
+  const userId = req.cookies["user_id"];
   const email = users[userId] ? users[userId].email : '';
   const templateVars = { urls: urlDatabase, email: email };
   return res.render('urls_login', templateVars);
@@ -105,11 +106,11 @@ app.post('/login', (req, res) => {
   const password = req.body.pass;
   const user = getUserByEmail(email);
 
-  if (!user) {
+  if (!users) {
     return res.status(403).send('not found');
   }
 
-  if (password !== user.password) {
+  if (password !== users.password) {
     return res.status(403).send('wrong password');
   }
 
@@ -157,7 +158,7 @@ app.post("/register", (req, res) => {
 
   // check if the user that was entered is inside of our database
   if (user) {
-    return res.status(403).send('already exists');
+    return res.status(403).send('error! account already exists');
   }
 
   const id = generateRandomString();
