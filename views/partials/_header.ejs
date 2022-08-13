@@ -19,7 +19,7 @@
       </div>
     </div>
     
-    <% if(!email){ %>
+    <% if(!user){ %>
       <h1>
         <a href="/login">
           <button class="btn btn-outline-dark">Login</button>
@@ -34,7 +34,7 @@
     <% } else{ %>  
       <h1>
         <form method="POST" action="/logout">
-          <span class="nav-item">Logged in as: <%= email %></span>
+          <span class="nav-item">Logged in as: <%= user.email%></span>
           <button class="btn btn-outline-dark">Logout</button>
         </form>
       </h1>
