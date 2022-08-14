@@ -1,8 +1,11 @@
 const express = require("express");
-const cookieParser = require('cookie-parser');
+const cookieSession = require('cookie-session');
 const app = express();
 const PORT = 8080; // default port 8080
 const path = require("path");
+const bcrypt = require('bcryptjs');
+const salt = bcrypt.genSaltSync(10);
+const getUserByEmail = require('./helpers');
 
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "/views"));
@@ -19,7 +22,13 @@ const urlDatabase = {
 };
 
 app.use(express.urlencoded({ extended: true }));
-app.use(cookieParser());
+app.use(cookieSession({
+  name: 'session',
+  keys: ['hello'],
+
+  // Cookie Options
+  maxAge: 24 * 60 * 60 * 1000 // 24 hours
+}));
 
 const users = {
   userRandomID: {
@@ -39,16 +48,6 @@ const generateRandomString = function() {
   let length = 6;
   return  Math.round((Math.pow(36, length + 1) - Math.random() * Math.pow(36, length))).toString(36).slice(1);
 
-};
-
-const getUserByEmail = function(email) {
-  for (let id in users) {
-    const user = users[id];
-    if (user.email === email) {
-      return user;
-    }
-  }
-  return null;
 };
 
 const urlsForUser = function(userID) {
@@ -75,7 +74,7 @@ app.get("/hello", (req, res) => {
 });
 
 app.get("/urls", (req, res) => {
-  const userID = req.cookies.user_id;
+  const userID = req.session.user_id;
   const user = users[userID];
   
   if (!user) {
@@ -90,11 +89,13 @@ app.get("/urls", (req, res) => {
 });
 
 app.get("/urls/new", (req, res) => {
-  const templateVars = { urls: urlDatabase, user: users[req.cookies['user_id']] };
-  
-  if (!users[req.cookies['user_id']]) {
-    return res.redirect("/login");
+  const userID = req.session.user_id;
+  const user = users[userID];
+
+  if (!user) {
+    return res.status(401).send("Please <a href='/login'>login</a> first to create new URL");
   }
+  const templateVars = { urls: urlDatabase, user: users[req.session['user_id']] };
     
   res.render('urls_new', templateVars);
 });
@@ -102,7 +103,7 @@ app.get("/urls/new", (req, res) => {
 app.get("/urls/:id", (req, res) => {
   const id = req.params.id;
   const url = urlDatabase[id];
-  const user = users[req.cookies['user_id']];
+  const user = users[req.session['user_id']];
 
   if (!user) {
     return res.status(401).send('please login first!');
@@ -129,18 +130,18 @@ app.get("/u/:id", (req, res) => {
 
 
 app.get('/login', (req, res) => {
-  const user = users[req.cookies['user_id']];
+  const user = users[req.session['user_id']];
   
   if (user) {
     return res.redirect('/urls');
   }
 
-  const templateVars = { urls: urlDatabase, user: users[req.cookies['user_id']] };
+  const templateVars = { urls: urlDatabase, user: users[req.session['user_id']] };
   res.render('urls_login', templateVars);
 });
 
 app.get("/register", (req, res) => {
-  const user = req.cookies["user_id"];
+  const user = users[req.session['user_id']];
   // const email = users[userId] ? users[userId].email : '';
   if (user) {
     return res.redirect('/urls');
@@ -152,38 +153,45 @@ app.get("/register", (req, res) => {
 app.post('/login', (req, res) => {
   const email = req.body.email;
   const password = req.body.password;
-  const user = getUserByEmail(email);
+  
+  if (!email || !password) {
+    return res.status(403).send("Email or Password cannot be empty. Please <a href='/login'>try again</a>");
+  }
 
-  if (!user || user.password !== password) {
-    return res.status(403).send("<a href='/login'>The credentials don't match. Please try again</a>");
+  const user = getUserByEmail(email, users);
+
+  if (user !== users) {
+    return res.status(403).send("User does not exist. Please <a href='/register'>register</a> your account first");
+  }
+
+  if (!user || !bcrypt.compareSync(password, user.password)) {
+    return res.status(403).send("The credentials don't match. Please <a href='/login'>try again</a>");
   }
 
   console.log(user);
-  res.cookie("user_id", user.id, { maxAge: 900000, httpOnly: true });
-  console.log('Cookies: ', req.cookies);
+  req.session['user_id'] = user.id;
+  // , { maxAge: 900000, httpOnly: true };
+  console.log('Cookies: ', req.session);
 
   res.redirect("/urls");
 });
 
 app.post("/logout", (req, res) => {
   // const id = req.cookie.user_id;
-  res.clearCookie('user_id');
-  console.log('Cookies: ', req.cookies);
+  req.session['user_id'] = null;
+  console.log('Cookies: ', req.session);
   res.redirect('/urls');
 });
 
 app.post("/urls", (req, res) => {
   const id = req.params.id;
   const url = urlDatabase[id];
-  const user = users[req.cookies['user_id']];
+  const user = users[req.session['user_id']];
 
   if (!user) {
     return res.status(401).send('not authorized to edit this URL!');
   }
 
-  if (url.userID !== user.id) {
-    return res.status(401).send('only authorized to see your own URLs');
-  }
 
   const templateVars = { url, user };
 
@@ -210,7 +218,7 @@ app.post("/urls/:id/edit", (req, res) => {
 
 app.post("/urls/:id/delete", (req, res) => {
   const {id} = req.params;
-  const user = users[req.cookies['user_id']];
+  const user = users[req.session['user_id']];
   const url = urlDatabase[id];
 
   if (!user) {
@@ -227,25 +235,26 @@ app.post("/urls/:id/delete", (req, res) => {
 
 app.post("/register", (req, res) => {
   const email = req.body.email;
-  const password = req.body.pass;
+  const password = req.body.password;
 
   // check if the user that was entered is inside of our database
-  const user = getUserByEmail(email);
+  if (!email || !password) {
+    return res.status(403).send("Email or Password cannot be empty. Please <a href='/register'>try again</a>");
+  }
+  const user = getUserByEmail(email, users);
+  
   if (user) {
     return res.status(403).send("User already exists. Please <a href='/register'>try again</a>");
-  }
-
-  if (email === "" || password === "") {
-    return res.status(403).send("Email or Password cannot be empty. Please <a href='/register'>try again</a>");
   }
   
   const id = generateRandomString();
 
-  let newUser = { id, email, password };
+  const newUser = { id, email, password: bcrypt.hashSync(password, salt)};
 
   users[id] = newUser;
   console.log(users);
-  res.cookie('user_id', id, { maxAge: 900000, httpOnly: true });
+  req.session['user_id'] = id;
+  //, { maxAge: 900000, httpOnly: true };
   res.redirect('/urls');
 
 });

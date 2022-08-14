@@ -13,7 +13,6 @@
     <body>
 
       <%- include('partials/_header') %>
-      
       <div class="card text-center">
         <div class="card-header">
         <div class="card-body">
@@ -24,13 +23,14 @@
         </div>
         </div class="card-footer text-muted"></div>
       </div>
+    
 
       <div class="card text-center">
         <div class="card-header">
         <div class="card-body">
           <h5 class="card-title">Edit</h5>
           <form style="display: flex;
-          justify-content: center;" class="form-inline" action="/urls/<%= id %>/edit" method="POST">
+          justify-content: center;" class="form-inline" action="/urls/<%= url.id %>/edit" method="POST">
             <p class="card-text">
               New URL: <input type="text" id="name" name="newURL" required
               minlength="4" maxlength="20" size="20">
