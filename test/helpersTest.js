@@ -1,7 +1,6 @@
 const { assert } = require('chai');
-const { epilog } = require('yargs');
 
-const { getUserByEmail } = require('../helpers.js');
+const { getUserByEmail } = require('../helpers');
 
 const testUsers = {
   "userRandomID": {
@@ -20,7 +19,7 @@ describe('getUserByEmail', function() {
   it('should return a user with valid email', function() {
     const user = getUserByEmail("user@example.com", testUsers);
     const expectedUserID = "userRandomID";
-    assert(getUserByEmail.isGroupValid([user, expectedUserID])).to.be.false;
+    assert.strictEqual(user.id, expectedUserID);
     // Write your assert statement here
   });
 });

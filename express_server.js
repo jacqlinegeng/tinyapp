@@ -5,7 +5,7 @@ const PORT = 8080; // default port 8080
 const path = require("path");
 const bcrypt = require('bcryptjs');
 const salt = bcrypt.genSaltSync(10);
-const getUserByEmail = require('./helpers');
+const {getUserByEmail} = require("./helpers");
 
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "/views"));
@@ -22,6 +22,7 @@ const urlDatabase = {
 };
 
 app.use(express.urlencoded({ extended: true }));
+
 app.use(cookieSession({
   name: 'session',
   keys: ['hello'],
@@ -95,28 +96,29 @@ app.get("/urls/new", (req, res) => {
   if (!user) {
     return res.status(401).send("Please <a href='/login'>login</a> first to create new URL");
   }
-  const templateVars = { urls: urlDatabase, user: users[req.session['user_id']] };
+  const templateVars = { urls: urlDatabase, user: user };
     
   res.render('urls_new', templateVars);
 });
 
 app.get("/urls/:id", (req, res) => {
   const id = req.params.id;
-  const url = urlDatabase[id];
+  const urlObj = urlDatabase[id];
   const user = users[req.session['user_id']];
+  const url = {...urlObj, shortURL: id};
 
   if (!user) {
-    return res.status(401).send('please login first!');
+    return res.status(401).send("Please <a href='/login'>login</a> first!");
   }
 
   if (url.userID !== user.id) {
-    return res.status(401).send('only authorized to see your own URLs');
+    return res.status(401).send('Only authorized to see your own URLs');
   }
 
   
-  const templateVars = { url, user};
+  const templateVars = { url, user };
   
-  return res.render("urls_show", templateVars);
+  res.render("urls_show", templateVars);
 });
 
 app.get("/u/:id", (req, res) => {
@@ -128,7 +130,6 @@ app.get("/u/:id", (req, res) => {
   res.redirect(longURL);
 });
 
-
 app.get('/login', (req, res) => {
   const user = users[req.session['user_id']];
   
@@ -136,16 +137,17 @@ app.get('/login', (req, res) => {
     return res.redirect('/urls');
   }
 
-  const templateVars = { urls: urlDatabase, user: users[req.session['user_id']] };
+  const templateVars = { urls: urlDatabase, user: user };
   res.render('urls_login', templateVars);
 });
 
 app.get("/register", (req, res) => {
   const user = users[req.session['user_id']];
-  // const email = users[userId] ? users[userId].email : '';
+
   if (user) {
     return res.redirect('/urls');
   }
+
   const templateVars = { urls: urlDatabase, user: user };
   res.render("urls_register", templateVars);
 });
@@ -155,82 +157,25 @@ app.post('/login', (req, res) => {
   const password = req.body.password;
   
   if (!email || !password) {
-    return res.status(403).send("Email or Password cannot be empty. Please <a href='/login'>try again</a>");
+    return res.status(400).send("Email or Password cannot be empty. Please <a href='/login'>try again</a>");
   }
-
+  
   const user = getUserByEmail(email, users);
+  console.log("user:", user);
 
-  if (user !== users) {
+  if (user === null) {
     return res.status(403).send("User does not exist. Please <a href='/register'>register</a> your account first");
   }
 
-  if (!user || !bcrypt.compareSync(password, user.password)) {
-    return res.status(403).send("The credentials don't match. Please <a href='/login'>try again</a>");
+  if (user.email !== email || !bcrypt.compareSync(password, user.password)) {
+    return res.status(403).send("The login credentials don't match. Please <a href='/login'>try again</a>");
   }
 
-  console.log(user);
   req.session['user_id'] = user.id;
   // , { maxAge: 900000, httpOnly: true };
   console.log('Cookies: ', req.session);
 
   res.redirect("/urls");
-});
-
-app.post("/logout", (req, res) => {
-  // const id = req.cookie.user_id;
-  req.session['user_id'] = null;
-  console.log('Cookies: ', req.session);
-  res.redirect('/urls');
-});
-
-app.post("/urls", (req, res) => {
-  const id = req.params.id;
-  const url = urlDatabase[id];
-  const user = users[req.session['user_id']];
-
-  if (!user) {
-    return res.status(401).send('not authorized to edit this URL!');
-  }
-
-
-  const templateVars = { url, user };
-
-  let newId = generateRandomString();
-  let longURLDATA = req.body.longURL;
-  let userIDDATA = templateVars.user.id;
-  urlDatabase[newId] = {};
-  urlDatabase[newId].longURL = longURLDATA;
-  urlDatabase[newId].userID = userIDDATA;
-
-  return res.redirect(`/urls/${newId}`);
-  
-});
-
-app.post("/urls/:id/edit", (req, res) => {
-  const {id} = req.params;
-  for (let shortURL in urlDatabase) {
-    if (shortURL === id) {
-      urlDatabase[id] = req.body.newURL;
-    }
-  }
-  res.redirect(`/urls`);
-});
-
-app.post("/urls/:id/delete", (req, res) => {
-  const {id} = req.params;
-  const user = users[req.session['user_id']];
-  const url = urlDatabase[id];
-
-  if (!user) {
-    return res.status(401).send("<a href='/login'>user not found. Please login first</a>");
-  }
-
-  if (url.userID !== user.id) {
-    return res.status(401).send('unable to delete URLs');
-  }
-  delete urlDatabase[id];
-  res.redirect(`/urls`);
-  
 });
 
 app.post("/register", (req, res) => {
@@ -248,17 +193,78 @@ app.post("/register", (req, res) => {
   }
   
   const id = generateRandomString();
+  const hash = bcrypt.hashSync(password, salt);
 
-  const newUser = { id, email, password: bcrypt.hashSync(password, salt)};
+  const newUser = { id, email, password: hash };
 
   users[id] = newUser;
   console.log(users);
   req.session['user_id'] = id;
   //, { maxAge: 900000, httpOnly: true };
+  
   res.redirect('/urls');
+});
 
+app.post("/logout", (req, res) => {
+  // const id = req.cookie.user_id;
+  req.session['user_id'] = null;
+
+  console.log('Cookies: ', req.session);
+
+  res.redirect('/urls');
+});
+
+app.post("/urls", (req, res) => {
+  const id = req.params.id;
+  const url = urlDatabase[id];
+  const user = users[req.session['user_id']];
+
+  if (!user) {
+    return res.status(401).send('not authorized to edit this URL!');
+  }
+
+  const templateVars = { url, user };
+
+  let newId = generateRandomString();
+  let longURLDATA = req.body.longURL;
+  let userIDDATA = templateVars.user.id;
+  
+  urlDatabase[newId] = {};
+  urlDatabase[newId].longURL = longURLDATA;
+  urlDatabase[newId].userID = userIDDATA;
+
+  res.redirect(`/urls`);
+});
+
+app.post("/urls/:id/edit", (req, res) => {
+  const {id} = req.params;
+  for (let shortURL in urlDatabase) {
+    if (shortURL === id) {
+      urlDatabase[shortURL].longURL = req.body.newURL;
+    }
+  }
+  
+  res.redirect(`/urls`);
+});
+
+app.post("/urls/:id/delete", (req, res) => {
+  const {id} = req.params;
+  const user = users[req.session['user_id']];
+  const url = urlDatabase[id];
+
+  if (!user) {
+    return res.status(401).send("<a href='/login'>user not found. Please login first</a>");
+  }
+
+  if (url.userID !== user.id) {
+    return res.status(401).send('unable to delete URLs');
+  }
+
+  delete urlDatabase[id];
+  
+  res.redirect(`/urls`);
 });
 
 app.listen(PORT, () => {
-  console.log(`Tiny app listening on port ${PORT}!`);
+  console.log(`Tiny App is listening on port ${PORT}!`);
 });
