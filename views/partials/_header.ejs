@@ -25,18 +25,17 @@
           <button class="btn btn-outline-primary">Login</button>
         </a>
      </h1>
-     
+
      <h1> 
         <a href="/register">
-        <button class="btn btn-outline-success">Register</button>
+          <button class="btn btn-outline-success">Register</button>
         </a>
      </h1>
     
-
     <% } else{ %>  
-      <h1 class="h6">
+      <h1 class="h6" style="text-align: center">
         <form method="POST" action="/logout">
-          <span class="font-weight-light, text-white bg-dark">Logged in as: <%= user.email%></span>
+          <span><a href="#" class="text-light bg-dark">Logged in as: <%= user.email%></a></span>
           <button class="btn btn-danger">Logout</button>
         </form>
       </h1>

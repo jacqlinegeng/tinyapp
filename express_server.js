@@ -184,12 +184,13 @@ app.post("/register", (req, res) => {
 
   // check if the user that was entered is inside of our database
   if (!email || !password) {
-    return res.status(403).send("Email or Password cannot be empty. Please <a href='/register'>try again</a>");
+    return res.render("urls_warning", {user: null, text: "Email or Password cannot be empty. "});
   }
+
   const user = getUserByEmail(email, users);
   
   if (user) {
-    return res.status(403).send("User already exists. Please <a href='/register'>try again</a>");
+    return res.render("urls_warning", {user: user, text: "User already exists."});
   }
   
   const id = generateRandomString();
