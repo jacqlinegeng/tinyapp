@@ -5,7 +5,7 @@ const PORT = 8080; // default port 8080
 const path = require("path");
 const bcrypt = require('bcryptjs');
 const salt = bcrypt.genSaltSync(10);
-const {getUserByEmail} = require("./helpers");
+const {getUserByEmail, generateRandomString, urlsForUser} = require("./helpers");
 
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "/views"));
@@ -44,26 +44,17 @@ const users = {
   },
 };
 
-// eslint-disable-next-line func-style
-const generateRandomString = function() {
-  let length = 6;
-  return  Math.round((Math.pow(36, length + 1) - Math.random() * Math.pow(36, length))).toString(36).slice(1);
 
-};
-
-const urlsForUser = function(userID) {
-  let urls = {};
-  for (let id in urlDatabase) {
-    const url = urlDatabase[id];
-    if (url.userID === userID) {
-      urls[id] = url;
-    }
-  }
-  return urls;
-};
 
 app.get("/", (req, res) => {
-  res.send("Hello!");
+  const userID = req.session.user_id;
+  const user = users[userID];
+
+  if (user) {
+    return res.redirect("/urls");
+  }
+  
+  res.redirect("/login");
 });
 
 app.get("/urls.json", (req, res) => {
@@ -82,7 +73,7 @@ app.get("/urls", (req, res) => {
     return res.status(401).send("Not logged in. Please <a href='/login'>login</a>");
   }
   
-  const urls = urlsForUser(user.id);
+  const urls = urlsForUser(user.id, urlDatabase);
 
   const templateVars = { urls, user };
   res.render("urls_index", templateVars);
@@ -94,7 +85,7 @@ app.get("/urls/new", (req, res) => {
   const user = users[userID];
 
   if (!user) {
-    return res.status(401).send("Please <a href='/login'>login</a> first to create new URL");
+    return res.redirect("/login");
   }
   const templateVars = { urls: urlDatabase, user: user };
     
@@ -102,20 +93,22 @@ app.get("/urls/new", (req, res) => {
 });
 
 app.get("/urls/:id", (req, res) => {
-  const id = req.params.id;
-  const urlObj = urlDatabase[id];
   const user = users[req.session['user_id']];
-  const url = {...urlObj, shortURL: id};
-
   if (!user) {
     return res.status(401).send("Please <a href='/login'>login</a> first!");
+  }
+
+  const id = req.params.id;
+  const url = urlDatabase[id];
+
+  if (!url) {
+    return res.status(404).send('URL does not exist');
   }
 
   if (url.userID !== user.id) {
     return res.status(401).send('Only authorized to see your own URLs');
   }
 
-  
   const templateVars = { url, user };
   
   res.render("urls_show", templateVars);
@@ -190,7 +183,7 @@ app.post("/register", (req, res) => {
   const user = getUserByEmail(email, users);
   
   if (user) {
-    return res.render("urls_warning", {user: user, text: "User already exists."});
+    return res.render("urls_warning", {user: null, text: "User already exists."});
   }
   
   const id = generateRandomString();
@@ -208,7 +201,7 @@ app.post("/register", (req, res) => {
 
 app.post("/logout", (req, res) => {
   // const id = req.cookie.user_id;
-  req.session['user_id'] = null;
+  req.session = null;
 
   console.log('Cookies: ', req.session);
 
@@ -216,35 +209,46 @@ app.post("/logout", (req, res) => {
 });
 
 app.post("/urls", (req, res) => {
-  const id = req.params.id;
-  const url = urlDatabase[id];
   const user = users[req.session['user_id']];
-
   if (!user) {
     return res.status(401).send('not authorized to edit this URL!');
   }
 
-  const templateVars = { url, user };
-
   let newId = generateRandomString();
-  let longURLDATA = req.body.longURL;
-  let userIDDATA = templateVars.user.id;
-  
-  urlDatabase[newId] = {};
-  urlDatabase[newId].longURL = longURLDATA;
-  urlDatabase[newId].userID = userIDDATA;
 
-  res.redirect(`/urls`);
+  urlDatabase[newId] = {
+    id: newId,
+    longURL: req.body.longURL,
+    userID: user.id
+  };
+
+  res.redirect(`/urls/${newId}`);
 });
 
 app.post("/urls/:id/edit", (req, res) => {
-  const {id} = req.params;
-  for (let shortURL in urlDatabase) {
-    if (shortURL === id) {
-      urlDatabase[shortURL].longURL = req.body.newURL;
-    }
+  const user = users[req.session['user_id']];
+  if (!user) {
+    return res.status(401).send('not authorized to edit this URL!');
   }
-  
+
+  const id = req.params.id;
+
+  const urlObj = urlDatabase[id];
+  if (!urlObj) {
+    return res.status(404).send('URL does not exist');
+  }
+
+  const urlBelongsToUser = urlObj.userID === user.id;
+  if (!urlBelongsToUser) {
+    return res.status(403).send('You are not the owner of this URL');
+  }
+
+  urlDatabase[id] = {
+    id,
+    longURL: req.body.newURL,
+    userID: user.id
+  };
+
   res.redirect(`/urls`);
 });
 

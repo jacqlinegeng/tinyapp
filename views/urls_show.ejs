@@ -18,19 +18,18 @@
         <div class="card-body">
           <h5 class="card-title">TinyURL for: <%= url.longURL %></h5>
           <p class="card-text">
-            Short URL ID: <a href="/u/<%= url.shortURL %>"><%= url.shortURL %></a>
+            Short URL ID: <a href="/u/<%= url.id %>"><%= url.id %></a>
           </p>
         </div>
         </div class="card-footer text-muted"></div>
       </div>
     
-
       <div class="card text-center">
         <div class="card-header">
         <div class="card-body">
           <h5 class="card-title">Edit</h5>
           <form style="display: flex;
-          justify-content: center;" class="form-inline" method="POST" action="/urls/<%= url.shortURL %>/edit">
+          justify-content: center;" class="form-inline" method="POST" action="/urls/<%= url.id %>/edit">
             <p class="card-text">
               New URL: <input type="text" id="name" name="newURL" required
               minlength="4" maxlength="20" size="20"/>
